@@ -1,28 +1,39 @@
 
 
-var canvas = document.querySelector("canvas");
-var c = canvas.getContext('2d');
+var canvas = document.querySelector("canvas"),
+    c = canvas.getContext('2d');
 
 canvas.width = 640;
 canvas.height = 640;
 c.fillRect(0,0,canvas.width, canvas.height);
 
-var tileSize = 32;
-var mapTileWidth = 20;
-var mapTileHeight = 20;
+var tileSize = 32,
+    mapTileWidth = 20,
+    mapTileHeight = 20;
 
+//Map arrays
+var stack = [],
+    map = [],
+    wall = [];
 
-var stack = [];
-var init = false;
+var mapLoaded = false;
 
-var map = [];
-var wall = [];
-var mapX = 0;
-var mapY = 0;
+//Player movement variables
+var velY = 0,
+    velX = 0,
+    friction = 0.80,
+    keys = [];
+
+// Player
+var Player = {
+    Blocked: false,
+    Speed: .75,
+    Position: [],
+    Dimensions: [5,5]
+}
 
 function initMap(){
     
-
     var mapHeight = mapTileWidth * tileSize;
     var mapWidth = mapTileHeight * tileSize;
 
@@ -31,13 +42,10 @@ function initMap(){
     var tilePosX = (randomizer(1, mapTileWidth-2) * tileSize);
     var tilePosY = (randomizer(1, mapTileHeight-2) * tileSize);
     
-    
-    
     //Don't change this value;
     var lastTile;
 
     var mapper = setInterval(function(){
-
 
         function declareMap(){
             var nextTile = randomizer(0,3); 
@@ -74,8 +82,8 @@ function initMap(){
                 }
             }
 
+            //Push the generated tile to the stack for collisions
             stack.push([tilePosX, tilePosY]);
-
 
             //Draws the map as it's generating
             c.fillStyle = "White";
@@ -84,33 +92,26 @@ function initMap(){
             //Write on the tiles as they generate
 
             // c.font = "10px Arial";
-            // c.fillStyle = "white";
+            // c.fillStyle = "black";
             // c.textAlign = 'center';
             // c.textBaseline= 'middle';
             // c.fillText(tileCounter, tilePosX + tileSize / 2, tilePosY + tileSize / 2);
-
 
             tileCounter++;
 
             //After level is done generating
             if(tileCounter === maxTileCount){
                 clearInterval(mapper);
-
+                //Initialize the player start position
                 var randomStart = randomizer(0, stack.length);
-
-                Player.Position[0] = stack[randomStart][0];
-                Player.Position[1] = stack[randomStart][1];
+                Player.Position[0] = stack[randomStart][0] +Player.Dimensions[0] +tileSize/2;
+                Player.Position[1] = stack[randomStart][1] +Player.Dimensions[1] +tileSize/2;
                 
-                
-
                 createMap();
             }
         }
-
         declareMap();
-
     }, 1);
-
 
     function createMap(){        
         var mapIndex = 0;
@@ -136,46 +137,102 @@ function initMap(){
             }
         }
 
+        mapLoaded = true;
         Items.Spawner();
-
-        levelDrawer();
-
-
-
+        update();
     }
 } // End init map
 
-
-function levelDrawer(){
-
-    for(var y = 0; y < mapTileHeight; y++){
-        for(var x = 0; x < mapTileWidth; x++){
-            switch(map[((y*mapTileWidth)+x)]){
-                case 0:
-                    c.fillStyle = "#999999";
-                    break;
-                default:
-                    c.fillStyle = "#eeeeee";
-                    break;
+var Items = {
+    Index:[
+        {
+            Name: "Key",
+            Color: "#cfcc26",
+            Dimensions: [10,10],
+            Position: [],
+            Hitbox: [-5, 15],
+            Obtained: false,
+            Interaction: function(){
+                this.Position = [];
+                this.Obtained = true;
+                Items.Index[1].noKey = false;
+                
             }
-            c.fillRect(x*tileSize, y*tileSize, tileSize, tileSize);
+        },
+        {
+            Name: "Door",
+            Color: "#947533",
+            Dimensions: [20,tileSize],
+            Position: [],
+            Hitbox: [-5, tileSize -5],
+            noKey: false,
+            Interaction: function(){
+                if(Items.Index[0].Obtained === true){
+                    location.reload();
+                } else{
+                    this.noKey = true;
+                }
+            }
+        },
+    ],
+
+    //Initializes the items
+    Spawner: function(){
+        for(i=0; i<Object.keys(Items.Index).length; i++){
+            if(Items.Index[i].Position){
+                Items.Index[i].Position = [];
+            }
+            var randomItemLocation = randomizer(0, stack.length - 1);
+            itemLocationX = stack[randomItemLocation][0];
+            itemLocationY = stack[randomItemLocation][1];
+            Items.Index[i].Position.push(itemLocationX, itemLocationY);
+            c.fillStyle = Items.Index[i].Color;
+            c.fillRect(Items.Index[i].Position[0], Items.Index[i].Position[1], Items.Index[i].Dimensions[0], Items.Index[i].Dimensions[1]);
+        }
+    },
+
+    //Keeps track of items every frame
+    Updater: function(){
+        for(i=0; i<Object.keys(Items.Index).length; i++){
+            if(Items.Index[i]){
+                c.fillStyle = Items.Index[i].Color;
+                c.fillRect(Items.Index[i].Position[0], Items.Index[i].Position[1], Items.Index[i].Dimensions[0], Items.Index[i].Dimensions[1]);
+            }
+        }
+    },
+
+    
+    Interact: function(){
+        for(i=0; i<Object.keys(Items.Index).length; i++){
+            if(Player.Position[0] <= Items.Index[i].Position[0] +Items.Index[i].Hitbox[1] && Player.Position[0] >= Items.Index[i].Position[0] +Items.Index[i].Hitbox[0]){
+                if( Player.Position[1] <= Items.Index[i].Position[1] +Items.Index[i].Hitbox[1] && Player.Position[1] >= Items.Index[i].Position[1] +Items.Index[i].Hitbox[0]){
+                    Items.Index[i].Interaction();
+                }
+            }
         }
     }
-    
-    loadPlayer(30);
 
-    Items.Loader();
-}
 
+
+    //Checks for player collisions with items
+    // Interact: function(){
+    //     for(i=0; i<Object.keys(Items.Index).length; i++){
+    //         if(Player.Position[0] <= Items.Index[i].Position[0] +5 && Player.Position[0] >= Items.Index[i].Position[0]){
+    //             if(Player.Position[1] >= Items.Index[i].Position[1] -5 && Player.Position[1] <= Items.Index[i].Position[1] +5){
+    //                 console.log("ITEM")
+    //                 // Items.Index[i].Interaction();
+    //             }
+    //         }
+    //     }
+    // }
+} // End Items
 
 function collisions(direction){
-
     if(direction == "up"){
         for(var w = 0; w<wall.length; w++){   
             if(Player.Position[0]+1 >= wall[w][0] && Player.Position[0]+1 <= wall[w][2]){
-                if(Player.Position[1] - Player.Speed < wall[w][3] && Player.Position[1] > wall[w][1]){
-                    console.log("up");
-                    return wall[w][3];
+                if(Player.Position[1] - Player.Speed  - Player.Dimensions[0]< wall[w][3] && Player.Position[1] > wall[w][1]){
+                    return wall[w][3] + Player.Dimensions[0];
                 }
             }    
         }
@@ -185,20 +242,17 @@ function collisions(direction){
         for(var w = 0; w<wall.length; w++){   
             if(Player.Position[0]+1 >= wall[w][0] && Player.Position[0]+1 <= wall[w][2]){
                 if(Player.Position[1] + Player.Speed + Player.Dimensions[0] > wall[w][1] && Player.Position[1] < wall[w][1]){
-                    console.log("down");
                     return wall[w][1] - Player.Dimensions[0];
                 }
             }    
         }
     }
 
-
     if(direction == "left"){
         for(var w = 0; w<wall.length; w++){   
             if(Player.Position[1]+1 >= wall[w][1] && Player.Position[1]+1 <= wall[w][3]){
-                if(Player.Position[0] - Player.Speed < wall[w][2] && Player.Position[0] > wall[w][0]){
-                    console.log("left");
-                    return wall[w][2];
+                if(Player.Position[0] - Player.Speed - Player.Dimensions[1] < wall[w][2] && Player.Position[0] > wall[w][0]){
+                    return wall[w][2] + Player.Dimensions[1];
                 }
             }    
         }
@@ -213,113 +267,153 @@ function collisions(direction){
             }
         }
     }
+}//End collisions
 
-}
+function update(){
+    requestAnimationFrame(update);
 
-
-var Items = {
-    Chest: {
-        Color: "#cfcc26",
-        Dimensions: [10,10]
-    },
-
-    //Initializes the items
-    Spawner: function(){
-        var randomItemLocation = randomizer(0, stack.length);
-        itemLocationX = stack[randomItemLocation][0];
-        itemLocationY = stack[randomItemLocation][1];
-    },
-
-    //Keeps track of items
-    Loader: function(){
-        //Load Chest
-        c.fillStyle = this.Chest.Color;
-        c.fillRect(itemLocationX, itemLocationY, this.Chest.Dimensions[0], this.Chest.Dimensions[1]);
-    }
-}
-
-// Player
-var Player = {
-    Blocked: false,
-    Speed: 5,
-    Position: [],
-    Dimensions: [10,10]
-}
-
-
-
-function loadPlayer(event, interval){
+    //This variable is important for the collision checker
     var movement;
 
-        switch (event.keyCode){
-            case 65: //Move Left
-                
-                movement = collisions("left");
+    //Check collisions up and down
+    if(velY > 0){
+        movement = collisions("down");
+        if(movement){
+            velY = 0;
+            return Player.Position[1] = movement;
+        }
+    } else if(velY < 0){
+        movement = collisions("up");
+        if(movement){
+            velY = 0;
+            return Player.Position[1] = movement;
+        }
+    }
 
-                if(movement){
-                    
-                    return Player.Position[0] = movement;
-                }
+    //Check collisions left and Right
+    if(velX < 0){
+        movement = collisions("left");
+        if(movement){
+            velX = 0;
+            return Player.Position[0] = movement;
+        }
+    }else if(velX > 0){
+        movement = collisions("right");
+        if(movement){ 
+            velX = 0;
+            return Player.Position[0] = movement;
+        }
+    }
 
-                Player.Position[0] -= Player.Speed;
-
-            break;
-            case 68: // Move Right
-
-
-            // Player.Position[0] += Player.Speed;
-
-                movement = collisions("right");
-
-                if(movement){ 
-                    return Player.Position[0] = movement;
-                }
-
-                Player.Position[0] += Player.Speed;
-
-            break;
-            case 87: // Move Up
-
-
-                movement = collisions("up");
-
-                if(movement){
-                    return Player.Position[1] = movement;
-                }
-
-                Player.Position[1] -= Player.Speed;
-            break;
-            case 83: //Move Down
-        
-
-
-                movement = collisions("down");
-                if(movement){
-                    return Player.Position[1] = movement;
-                }
-                Player.Position[1] += Player.Speed;
-            break;
+    if(keys[65]){   //Left
+        if(velX > -Player.Speed){
+            velX--;
+        }
+    }
+    if(keys[68]){   //Right
+        if(velX < Player.Speed){
+            velX++;
+        }
+    }
+    if(keys[87]){   //Up
+        if(velY > -Player.Speed){
+            velY--;
+        }
+    }
+    if(keys[83]){   //Down
+        if(velY < Player.Speed){
+            velY++;
+        }
     }
 
 
+
+    ///This draws the map
+    for(var y = 0; y < mapTileHeight; y++){
+        for(var x = 0; x < mapTileWidth; x++){
+            switch(map[((y*mapTileWidth)+x)]){
+                case 0:
+                    c.fillStyle = "#999999";
+                    break;
+                default:
+                    c.fillStyle = "#eeeeee";
+                    break;
+            }
+            c.fillRect(x*tileSize, y*tileSize, tileSize, tileSize);
+        }
+    }
+
+    if(Items.Index[0].Obtained === true){
+        c.fillStyle = 'white';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle'
+        c.font = '20px Arial'
+        c.fillText("You have obtained the key!", canvas.width/2, tileSize/2);
+        c.stroke();
+    }
+
+    if(Items.Index[1].noKey === true){
+        c.fillStyle = 'white';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle'
+        c.font = '20px Arial'
+        c.fillText("You must first obtain the key!", canvas.width/2, tileSize/2);
+        c.stroke();
+    }
+
+    Items.Interact();
+    Items.Updater();
+    //The section above draws the map
+
+    velY *= friction;
+    Player.Position[1] += velY;
+    velX *= friction;
+    Player.Position[0] += velX;
+    
+    //Draws the player
     c.fillStyle = 'blue';
-    c.fillRect(Player.Position[0], Player.Position[1], Player.Dimensions[0], Player.Dimensions[1]);
+
+    c.beginPath();
+    c.arc(Player.Position[0], Player.Position[1], 5, 0, Math.PI * 2);
+    c.fill();
+} // END UPDATE
 
 
-    //Player has to initialize before listening to key events
-    window.addEventListener('keydown', loadPlayer, true);
 
-    var playerMovement = setInterval(function(){
-        levelDrawer();
-    },interval);
+//Listen for keys
+window.addEventListener('keydown', function(e){
+    if(mapLoaded === true){
+        keys[e.keyCode] = true;
+    }
+}, true);
+
+window.addEventListener('keyup', function(e){
+    if(mapLoaded === true){
+        keys[e.keyCode] = false;
+    }
+}, true);
+//End key listeners
+
+window.onload = function(){
+    initMap();
 }
 
 
 
 
-initMap();
 
-
-window.onload = function(){
-
+function reloadMap(){
+    while(i<=map.length){
+        map.pop(i);
+    }
+    map.pop(0);
+    while(i<=stack.length){
+        stack.pop(i);
+    }
+    stack.pop(0);
+    while(i<=wall.length){
+        wall.pop(i);
+    }
+    wall.pop(0);
+    initMap();
 }
