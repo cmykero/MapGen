@@ -11,6 +11,13 @@ var tileSize = 32,
     mapTileWidth = 20,
     mapTileHeight = 20;
 
+
+var tileSet = new Image(),
+    tileSetSize = 32;
+tileSet.src = 'Assets/Dungeon tilemap.png';
+
+    
+
 //Map arrays
 var stack = [],
     map = [],
@@ -103,9 +110,10 @@ function initMap(){
             if(tileCounter === maxTileCount){
                 clearInterval(mapper);
                 //Initialize the player start position
-                var randomStart = randomizer(0, stack.length);
-                Player.Position[0] = stack[randomStart][0] +Player.Dimensions[0] +tileSize/2;
-                Player.Position[1] = stack[randomStart][1] +Player.Dimensions[1] +tileSize/2;
+                var randomStart = randomizer(0, stack.length - 1);
+                randomStart = stack[randomStart];
+                Player.Position[0] = randomStart[0] +Player.Dimensions[0] +tileSize/2;
+                Player.Position[1] = randomStart[1] +Player.Dimensions[1] +tileSize/2;
                 
                 createMap();
             }
@@ -211,20 +219,6 @@ var Items = {
             }
         }
     }
-
-
-
-    //Checks for player collisions with items
-    // Interact: function(){
-    //     for(i=0; i<Object.keys(Items.Index).length; i++){
-    //         if(Player.Position[0] <= Items.Index[i].Position[0] +5 && Player.Position[0] >= Items.Index[i].Position[0]){
-    //             if(Player.Position[1] >= Items.Index[i].Position[1] -5 && Player.Position[1] <= Items.Index[i].Position[1] +5){
-    //                 console.log("ITEM")
-    //                 // Items.Index[i].Interaction();
-    //             }
-    //         }
-    //     }
-    // }
 } // End Items
 
 function collisions(direction){
@@ -326,22 +320,8 @@ function update(){
         }
     }
 
-
-
-    ///This draws the map
-    for(var y = 0; y < mapTileHeight; y++){
-        for(var x = 0; x < mapTileWidth; x++){
-            switch(map[((y*mapTileWidth)+x)]){
-                case 0:
-                    c.fillStyle = "#999999";
-                    break;
-                default:
-                    c.fillStyle = "#eeeeee";
-                    break;
-            }
-            c.fillRect(x*tileSize, y*tileSize, tileSize, tileSize);
-        }
-    }
+    /// creates the sprites for the map walls and floors
+    mapSprites();
 
     if(Items.Index[0].Obtained === true){
         c.fillStyle = 'white';
